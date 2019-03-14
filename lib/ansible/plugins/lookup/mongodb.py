@@ -17,8 +17,6 @@
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import (absolute_import, division, print_function)
-from ansible.module_utils.six import string_types, integer_types
-from ansible.module_utils._text import to_native
 
 __metaclass__ = type
 
@@ -64,7 +62,9 @@ DOCUMENTATION = '''
             type: integer
         sort:
             description:
-                - Sorting rules. Please use the strings "ASCENDING" and "DESCENDING" to set the order. Check the example for more information.
+                - Sorting rules.
+                - Please use the strings C(ASCENDING) and C(DESCENDING) to set the order.
+                - Check the example for more information.
             type: list
             default: "[]"
     notes:
@@ -145,6 +145,8 @@ RETURN = """
 
 import datetime
 
+from ansible.module_utils.six import string_types, integer_types
+from ansible.module_utils._text import to_native
 from ansible.errors import AnsibleError
 from ansible.plugins.lookup import LookupBase
 
@@ -220,7 +222,7 @@ class LookupModule(LookupBase):
 
     def _run_helper(self, terms):
         if not pymongo_found:
-            raise AnsibleError(u"pymongo is required in the master node (this machine) for mongodb lookup.")
+            raise AnsibleError(u"pymongo is required in the control node (this machine) for mongodb lookup.")
         ret = []
         for term in terms:
             for required_parameter in [u"database", u"collection"]:
