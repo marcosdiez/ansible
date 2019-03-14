@@ -16,7 +16,7 @@ DOCUMENTATION = '''
         - inventory_cache
     description:
         - Get inventory hosts from Google Cloud Platform GCE.
-        - Uses a <name>.gcp.yaml (or <name>.gcp.yml) YAML configuration file.
+        - Uses a YAML configuration file that ends with gcp_compute.(yml|yaml) or gcp.(yml|yaml).
     options:
         plugin:
             description: token that ensures this is a source file for the 'gcp_compute' plugin.
@@ -48,6 +48,20 @@ DOCUMENTATION = '''
             description:
                 - An optional service account email address if machineaccount is selected
                   and the user does not wish to use the default email.
+        vars_prefix:
+            description: prefix to apply to host variables, does not include facts nor params
+            default: ''
+        use_contrib_script_compatible_sanitization:
+          description:
+            - By default this plugin is using a general group name sanitization to create safe and usable group names for use in Ansible.
+              This option allows you to override that, in efforts to allow migration from the old inventory script.
+            - For this to work you should also turn off the TRANSFORM_INVALID_GROUP_CHARS setting,
+              otherwise the core engine will just use the standard sanitization on top.
+            - This is not the default as such names break certain functionality as not all characters are valid Python identifiers
+              which group names end up being used as.
+          type: bool
+          default: False
+          version_added: '2.8'
 '''
 
 EXAMPLES = '''
@@ -78,10 +92,9 @@ compose:
 '''
 
 from ansible.errors import AnsibleError, AnsibleParserError
-from ansible.module_utils._text import to_native, to_text
-from ansible.module_utils.six import string_types
+from ansible.module_utils._text import to_native
 from ansible.module_utils.gcp_utils import GcpSession, navigate_hash, GcpRequestException
-from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cacheable, to_safe_group_name
+from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cacheable
 import json
 
 
@@ -111,7 +124,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         hostname = self._get_hostname(item)
         self.inventory.add_host(hostname)
         for key in item:
-            self.inventory.set_variable(hostname, key, item[key])
+            try:
+                self.inventory.set_variable(hostname, self.get_option('vars_prefix') + key, item[key])
+            except (ValueError, TypeError) as e:
+                self.display.warning("Could not set host info hostvar for %s, skipping %s: %s" % (hostname, key, to_native(e)))
         self.inventory.add_child('all', hostname)
 
     def verify_file(self, path):
@@ -120,9 +136,9 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             :return the contents of the config file
         '''
         if super(InventoryModule, self).verify_file(path):
-            if path.endswith('.gcp.yml') or path.endswith('.gcp.yaml'):
+            if path.endswith(('gcp.yml', 'gcp.yaml')):
                 return True
-            elif path.endswith('.gcp_compute.yml') or path.endswith('.gcp_compute.yaml'):
+            elif path.endswith(('gcp_compute.yml', 'gcp_compute.yaml')):
                 return True
         return False
 
@@ -317,8 +333,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         super(InventoryModule, self).parse(inventory, loader, path)
 
         config_data = {}
-        if self.verify_file(path):
-            config_data = self._read_config_data(path)
+        config_data = self._read_config_data(path)
+
+        if self.get_option('use_contrib_script_compatible_sanitization'):
+            self._sanitize_group_name = self._legacy_script_compatible_group_sanitization
 
         # get user specifications
         if 'zones' in config_data:
@@ -331,6 +349,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
         if not isinstance(config_data['projects'], list):
             raise AnsibleParserError("Projects must be a list in GCP inventory YAML files")
+
+        # add in documented defaults
+        if 'filters' not in config_data:
+            config_data['filters'] = None
 
         projects = config_data['projects']
         zones = config_data.get('zones')
@@ -371,3 +393,8 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
         if cache_needs_update:
             self.cache.set(cache_key, cached_data)
+
+    @staticmethod
+    def _legacy_script_compatible_group_sanitization(name):
+
+        return name

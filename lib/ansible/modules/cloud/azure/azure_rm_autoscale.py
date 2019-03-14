@@ -179,7 +179,7 @@ options:
                 description: A value indicating whether to send email to subscription co-administrators.
     state:
         default: present
-        description: Assert the state of the virtual network. Use 'present' to create or update and 'absent' to delete.
+        description: Assert the state of the virtual network. Use C(present) to create or update and C(absent) to delete.
         choices:
         - present
         - absent
@@ -218,7 +218,7 @@ EXAMPLES = '''
         recurrence_hours:
         - '18'
       name: scale
-      resource_group: foo
+      resource_group: myResourceGroup
 
 - name: Create an auto scale with compicated profile
   azure_rm_autoscale:
@@ -256,12 +256,12 @@ EXAMPLES = '''
         custom_emails:
         - yuwzho@microsoft.com
       name: scale
-      resource_group: foo
+      resource_group: myResourceGroup
 
 - name: Delete an Azure Auto Scale Setting
   azure_rm_autoscale:
     state: absent
-    resource_group: foo
+    resource_group: myResourceGroup
     name: scale
 '''
 
@@ -326,6 +326,7 @@ state:
 '''  # NOQA
 
 from ansible.module_utils.azure_rm_common import AzureRMModuleBase, format_resource_id
+from ansible.module_utils._text import to_native
 from datetime import timedelta
 
 try:
@@ -333,12 +334,12 @@ try:
     from msrestazure.azure_exceptions import CloudError
     from azure.mgmt.monitor.models import WebhookNotification, EmailNotification, AutoscaleNotification, RecurrentSchedule, MetricTrigger, \
         ScaleAction, AutoscaleSettingResource, AutoscaleProfile, ScaleCapacity, TimeWindow, Recurrence, ScaleRule
-    from ansible.module_utils._text import to_native
 except ImportError:
     # This is handled in azure_rm_common
     pass
 
 
+# duplicated in azure_rm_autoscale_facts
 def timedelta_to_minutes(time):
     if not time:
         return 0
@@ -549,8 +550,9 @@ class AzureRMAutoScale(AzureRMModuleBase):
                                                                schedule=(RecurrentSchedule(time_zone=p.get('recurrence_timezone'),
                                                                                            days=p.get('recurrence_days'),
                                                                                            hours=p.get('recurrence_hours'),
-                                                                                           minutes=p.get('recurrence_mins')))
-                                                               if p.get('recurrence_frequency') else None)) for p in self.profiles or []]
+                                                                                           minutes=p.get('recurrence_mins'))))
+                                         if p.get('recurrence_frequency') and p['recurrence_frequency'] != 'None' else None)
+                        for p in self.profiles or []]
 
             notifications = [AutoscaleNotification(email=EmailNotification(**n),
                                                    webhooks=[WebhookNotification(service_uri=w) for w in n.get('webhooks') or []])

@@ -10,7 +10,7 @@ DOCUMENTATION = '''
     short_description: virtualbox inventory source
     description:
         - Get inventory hosts from the local virtualbox installation.
-        - Uses a <name>.vbox.yaml (or .vbox.yml) YAML configuration file.
+        - Uses a YAML configuration file that ends with virtualbox.(yml|yaml) or vbox.(yml|yaml).
         - The inventory_hostname is always the 'Name' of the virtualbox instance.
     extends_documentation_fragment:
       - constructed
@@ -71,7 +71,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             if 'Value' in ipinfo:
                 a, ip = ipinfo.split(':', 1)
                 ret = ip.strip()
-        except:
+        except Exception:
             pass
         return ret
 
@@ -107,7 +107,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             if group == 'all':
                 continue
             else:
-                self.inventory.add_group(group)
+                group = self.inventory.add_group(group)
                 hosts = source_data[group].get('hosts', [])
                 for host in hosts:
                     self._populate_host_vars([host], hostvars.get(host, {}), group)
@@ -137,7 +137,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                 continue
             try:
                 k, v = line.split(':', 1)
-            except:
+            except Exception:
                 # skip non splitable
                 continue
 
@@ -162,10 +162,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             elif k == 'Groups':
                 for group in v.split('/'):
                     if group:
+                        group = self.inventory.add_group(group)
+                        self.inventory.add_child(group, current_host)
                         if group not in cacheable_results:
                             cacheable_results[group] = {'hosts': []}
-                        self.inventory.add_group(group)
-                        self.inventory.add_child(group, current_host)
                         cacheable_results[group]['hosts'].append(current_host)
                 continue
 
@@ -210,7 +210,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
         valid = False
         if super(InventoryModule, self).verify_file(path):
-            if path.endswith(('.vbox.yaml', '.vbox.yml')):
+            if path.endswith(('virtualbox.yaml', 'virtualbox.yml', 'vbox.yaml', 'vbox.yml')):
                 valid = True
         return valid
 
@@ -237,7 +237,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                 update_cache = True
 
         if not source_data:
-            b_pwfile = to_bytes(self.get_option('settings_password_file'), errors='surrogate_or_strict')
+            b_pwfile = to_bytes(self.get_option('settings_password_file'), errors='surrogate_or_strict', nonstring='passthru')
             running = self.get_option('running_only')
 
             # start getting data

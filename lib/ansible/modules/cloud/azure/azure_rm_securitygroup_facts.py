@@ -11,7 +11,7 @@ __metaclass__ = type
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ['preview'],
-                    'supported_by': 'certified'}
+                    'supported_by': 'community'}
 
 
 DOCUMENTATION = '''
@@ -49,12 +49,12 @@ author:
 EXAMPLES = '''
     - name: Get facts for one security group
       azure_rm_securitygroup_facts:
-        resource_group: Testing
+        resource_group: myResourceGroup
         name: secgroup001
 
     - name: Get facts for all security groups
       azure_rm_securitygroup_facts:
-        resource_group: Testing
+        resource_group: myResourceGroup
 
 '''
 
@@ -190,7 +190,7 @@ azure_securitygroups:
 
 try:
     from msrestazure.azure_exceptions import CloudError
-except:
+except Exception:
     # This is handled in azure_rm_common
     pass
 

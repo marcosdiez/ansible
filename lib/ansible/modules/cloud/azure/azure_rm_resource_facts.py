@@ -69,10 +69,10 @@ author:
 EXAMPLES = '''
   - name: Get scaleset info
     azure_rm_resource_facts:
-      resource_group: "{{ resource_group }}"
+      resource_group: myResourceGroup
       provider: compute
       resource_type: virtualmachinescalesets
-      resource_name: "{{ scaleset_name }}"
+      resource_name: myVmss
       api_version: "2017-12-01"
 '''
 
@@ -102,28 +102,22 @@ class AzureRMResourceFacts(AzureRMModuleBase):
         # define user inputs into argument
         self.module_arg_spec = dict(
             url=dict(
-                type='str',
-                required=False
+                type='str'
             ),
             provider=dict(
-                type='str',
-                required=False
+                type='str'
             ),
             resource_group=dict(
-                type='str',
-                required=False
+                type='str'
             ),
             resource_type=dict(
-                type='str',
-                required=False
+                type='str'
             ),
             resource_name=dict(
-                type='str',
-                required=False
+                type='str'
             ),
             subresource=dict(
                 type='list',
-                required=False,
                 default=[]
             ),
             api_version=dict(
@@ -133,7 +127,7 @@ class AzureRMResourceFacts(AzureRMModuleBase):
         )
         # store the results of the module operation
         self.results = dict(
-            response=None
+            response=[]
         )
         self.mgmt_client = None
         self.url = None
@@ -189,18 +183,24 @@ class AzureRMResourceFacts(AzureRMModuleBase):
 
         header_parameters = {}
         header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        skiptoken = None
 
-        response = self.mgmt_client.query(self.url, "GET", query_parameters, header_parameters, None, [200, 404])
-
-        try:
-            response = json.loads(response.text)
-            if response is list:
-                self.results['response'] = response
-            else:
-                self.results['response'] = [response]
-        except:
-            self.results['response'] = []
-
+        while True:
+            if skiptoken:
+                query_parameters['skiptoken'] = skiptoken
+            response = self.mgmt_client.query(self.url, "GET", query_parameters, header_parameters, None, [200, 404], 0, 0)
+            try:
+                response = json.loads(response.text)
+                if isinstance(response, dict):
+                    if response.get('value'):
+                        self.results['response'] = self.results['response'] + response['value']
+                        skiptoken = response.get('nextLink')
+                    else:
+                        self.results['response'] = self.results['response'] + [response]
+            except Exception as e:
+                self.fail('Failed to parse response: ' + str(e))
+            if not skiptoken:
+                break
         return self.results
 
 

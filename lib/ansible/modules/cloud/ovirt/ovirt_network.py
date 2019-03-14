@@ -146,6 +146,7 @@ from ansible.module_utils.ovirt import (
     search_by_name,
     get_id_by_name,
     get_dict_of_struct,
+    get_entity
 )
 
 
@@ -183,8 +184,8 @@ class NetworksModule(BaseModule):
         if self.param('label') is None:
             return
 
-        labels = [lbl.id for lbl in self._connection.follow_link(entity.network_labels)]
         labels_service = self._service.service(entity.id).network_labels_service()
+        labels = [lbl.id for lbl in labels_service.list()]
         if not self.param('label') in labels:
             if not self._module.check_mode:
                 if labels:
@@ -213,6 +214,10 @@ class ClusterNetworksModule(BaseModule):
         super(ClusterNetworksModule, self).__init__(*args, **kwargs)
         self._network_id = network_id
         self._cluster_network = cluster_network
+        self._old_usages = []
+        self._cluster_network_entity = get_entity(self._service.network_service(network_id))
+        if self._cluster_network_entity is not None:
+            self._old_usages = self._cluster_network_entity.usages
 
     def build_entity(self):
         return otypes.Network(
@@ -220,11 +225,12 @@ class ClusterNetworksModule(BaseModule):
             name=self._module.params['name'],
             required=self._cluster_network.get('required'),
             display=self._cluster_network.get('display'),
-            usages=[
+            usages=list(set([
                 otypes.NetworkUsage(usage)
                 for usage in ['display', 'gluster', 'migration']
                 if self._cluster_network.get(usage, False)
-            ] if (
+            ] + self._old_usages))
+            if (
                 self._cluster_network.get('display') is not None or
                 self._cluster_network.get('gluster') is not None or
                 self._cluster_network.get('migration') is not None
@@ -235,18 +241,18 @@ class ClusterNetworksModule(BaseModule):
         return (
             equal(self._cluster_network.get('required'), entity.required) and
             equal(self._cluster_network.get('display'), entity.display) and
-            equal(
-                sorted([
-                    usage
-                    for usage in ['display', 'gluster', 'migration']
-                    if self._cluster_network.get(usage, False)
-                ]),
-                sorted([
+            all(
+                x in [
                     str(usage)
                     for usage in getattr(entity, 'usages', [])
                     # VM + MANAGEMENT is part of root network
                     if usage != otypes.NetworkUsage.VM and usage != otypes.NetworkUsage.MANAGEMENT
-                ]),
+                ]
+                for x in [
+                    usage
+                    for usage in ['display', 'gluster', 'migration']
+                    if self._cluster_network.get(usage, False)
+                ]
             )
         )
 

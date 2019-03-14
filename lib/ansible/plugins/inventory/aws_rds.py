@@ -10,7 +10,7 @@ DOCUMENTATION = '''
     short_description: rds instance source
     description:
         - Get instances and clusters from Amazon Web Services RDS.
-        - Uses a <name>.aws_rds.yaml (or <name>.aws_rds.yml) YAML configuration file.
+        - Uses a YAML configuration file that ends with aws_rds.(yml|yaml).
     options:
         boto_profile:
           description: The boto profile to use. The plugin will look for an instance role if no credentials
@@ -166,8 +166,8 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
     def _get_all_hosts(self, regions, instance_filters, cluster_filters, strict, statuses, gather_clusters=False):
         '''
            :param regions: a list of regions in which to describe hosts
-           :param instance_filters: a list of boto3 filter dicionaries
-           :param cluster_filters: a list of boto3 filter dicionaries
+           :param instance_filters: a list of boto3 filter dictionaries
+           :param cluster_filters: a list of boto3 filter dictionaries
            :param strict: a boolean determining whether to fail or ignore 403 error codes
            :param statuses: a list of statuses that the returned hosts should match
            :return A list of host dictionaries
@@ -301,7 +301,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             :return the contents of the config file
         '''
         if super(InventoryModule, self).verify_file(path):
-            if path.endswith('.aws_rds.yml') or path.endswith('.aws_rds.yaml'):
+            if path.endswith(('aws_rds.yml', 'aws_rds.yaml')):
                 return True
         return False
 
